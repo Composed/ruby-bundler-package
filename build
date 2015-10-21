@@ -1,0 +1,29 @@
+#!/bin/bash
+
+REPO_NAME="ruby-bundler-package"
+RELEASE="$1"
+IMAGE_NAME="${REPO_NAME}:${RELEASE}"
+
+set -e
+
+cd "$(dirname "$0")"
+
+rm -r dist 2>/dev/null || true
+mkdir -p dist
+
+if ! [[ -f "${RELEASE}/Dockerfile" ]]; then
+  echo "invalid release"
+  exit 1
+fi
+
+docker build -t "${IMAGE_NAME}" "$RELEASE/"
+container_id="$(docker create "${IMAGE_NAME}")"
+docker start -a "$container_id"
+docker cp "${container_id}:/tmp/ruby-bundler-package/" dist/
+docker rm "$container_id" >/dev/null
+
+if [[ $(find dist/ -type f -name '*.deb' -printf x | wc -c) != 1 ]]; then
+  echo "expected to find exactly one .deb; found:"
+  find dist -type f -name '*.deb'
+  exit 1
+fi
